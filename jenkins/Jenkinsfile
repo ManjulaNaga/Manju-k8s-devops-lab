@@ -1,0 +1,129 @@
+// Test -> build -> push -> dev -> smoke test -> approval -> prod -> smoke test
+// The same image is promoted to prod; it is never rebuilt.
+
+def deployTo(String overlay, String namespace) {
+    dir("k8s/overlays/${overlay}") {
+        sh """
+            set -eu
+            kustomize edit set image demo-app=${env.IMAGE}:${env.IMAGE_TAG}
+            kubectl apply -k .
+            if ! kubectl -n ${namespace} rollout status deployment/demo-app --timeout=180s; then
+                echo 'Rollout failed. Recent state:'
+                kubectl -n ${namespace} get pods
+                kubectl -n ${namespace} get events --sort-by=.lastTimestamp | tail -n 20
+                kubectl -n ${namespace} rollout undo deployment/demo-app || true
+                exit 1
+            fi
+        """
+    }
+}
+
+def smokeTest(String overlay) {
+    sh """
+        set -u
+        for attempt in \$(seq 1 15); do
+            body=\$(curl -fsS -m 5 -H 'Host: app.${overlay}.localtest.me' \
+                "http://${env.CLUSTER_NODE}:30080/version" || true)
+            echo "attempt \$attempt: \$body"
+            case "\$body" in *${env.IMAGE_TAG}*) exit 0 ;; esac
+            sleep 4
+        done
+        echo 'Smoke test failed: expected version not served'
+        exit 1
+    """
+}
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        IMAGE = 'localhost:5001/demo-app'
+        CLUSTER_NODE = 'devops-lab-control-plane'
+    }
+
+    stages {
+        stage('Prepare') {
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(returnStdout: true, script: 'git rev-parse --short=12 HEAD').trim()
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Validate manifests') {
+            steps {
+                sh '''
+                    set -eu
+                    kustomize build k8s/overlays/dev > /dev/null
+                    kustomize build k8s/overlays/prod > /dev/null
+                    kubectl apply --dry-run=server -k k8s/overlays/dev
+                    kubectl apply --dry-run=server -k k8s/overlays/prod
+                '''
+            }
+        }
+
+        stage('Unit tests') {
+            steps {
+                sh 'docker build --target test -t demo-app:test app'
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                sh 'docker build --target runtime --build-arg APP_VERSION="$IMAGE_TAG" -t "$IMAGE:$IMAGE_TAG" app'
+            }
+        }
+
+        stage('Push image') {
+            steps {
+                sh 'docker push "$IMAGE:$IMAGE_TAG"'
+            }
+        }
+
+        stage('Deploy to dev') {
+            steps {
+                script { deployTo('dev', 'demo-dev') }
+            }
+        }
+
+        stage('Smoke test dev') {
+            steps {
+                script { smokeTest('dev') }
+            }
+        }
+
+        stage('Approve prod') {
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input message: "Deploy ${env.IMAGE_TAG} to prod?", ok: 'Deploy'
+                }
+            }
+        }
+
+        stage('Deploy to prod') {
+            steps {
+                script { deployTo('prod', 'demo-prod') }
+            }
+        }
+
+        stage('Smoke test prod') {
+            steps {
+                script { smokeTest('prod') }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

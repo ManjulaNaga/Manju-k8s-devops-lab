@@ -1,0 +1,46 @@
+jenkins:
+  systemMessage: "Local DevOps lab. Configured by jenkins/casc.yaml."
+  numExecutors: 2
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: ${JENKINS_ADMIN_PASSWORD}
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: http://localhost:8080/
+
+jobs:
+  - script: |
+      pipelineJob('demo-app') {
+        description('Builds, tests and deploys demo-app. Polls Git every minute.')
+        properties {
+          pipelineTriggers {
+            triggers {
+              pollSCM {
+                scmpoll_spec('* * * * *')
+              }
+            }
+          }
+        }
+        definition {
+          cpsScm {
+            scriptPath('jenkins/Jenkinsfile')
+            lightweight(false)
+            scm {
+              git {
+                remote {
+                  url('${GIT_REPO_URL:-file:///repo}')
+                }
+                branch('*/main')
+              }
+            }
+          }
+        }
+      }

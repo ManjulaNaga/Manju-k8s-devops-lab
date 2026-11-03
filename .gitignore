@@ -1,0 +1,11 @@
+.env
+jenkins/generated/*
+!jenkins/generated/.gitkeep
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+__pycache__/
+.pytest_cache/
+.venv/
+.DS_Store
