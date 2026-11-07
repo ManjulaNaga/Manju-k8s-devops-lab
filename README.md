@@ -50,8 +50,8 @@ brew install git kind kubectl hashicorp/tap/terraform
 - A Git identity, if you haven't set one:
 
 ```bash
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
+git config --global user.name "ManjulaNaga"
+git config --global user.email "knmanju488@gmail.com"
 ```
 
 Ports 8080 (Jenkins), 8088 (apps) and 5001 (registry) must be free.

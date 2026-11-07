@@ -3,8 +3,6 @@ services:
     build: ./jenkins
     container_name: jenkins
     restart: unless-stopped
-    # Root plus the Docker socket gives this container full control of Docker.
-    # That is acceptable for a local lab only. Never run it this way on a shared server.
     user: root
     ports:
       - "127.0.0.1:8080:8080"
@@ -13,8 +11,9 @@ services:
         -Djenkins.install.runSetupWizard=false
         -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
       CASC_JENKINS_CONFIG: /var/jenkins_conf/casc.yaml
+      JENKINS_ADMIN_USER: ${JENKINS_USER:-admin}
       JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?Run make env first}
-      GIT_REPO_URL: ${GIT_REPO_URL:-file:///repo}
+      GIT_REPO_URL: ${GIT_REPO_URL:-https://github.com/ManjulaNaga/Manju-k8s-devops-lab.git}
       KUBECONFIG: /etc/jenkins-kube/config
     volumes:
       - jenkins_home:/var/jenkins_home

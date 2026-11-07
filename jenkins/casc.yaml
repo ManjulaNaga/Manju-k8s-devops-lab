@@ -2,15 +2,15 @@ jenkins:
   systemMessage: "Local DevOps lab. Configured by jenkins/casc.yaml."
   numExecutors: 2
   mode: NORMAL
-  securityRealm:
-    local:
-      allowsSignup: false
-      users:
-        - id: admin
-          password: ${JENKINS_ADMIN_PASSWORD}
-  authorizationStrategy:
-    loggedInUsersCanDoAnything:
-      allowAnonymousRead: false
+  # securityRealm:
+  #   local:
+  #     allowsSignup: false
+  #     users:
+  #       - id: admin
+  #         password: ${JENKINS_ADMIN_PASSWORD}
+  authorizationStrategy: unsecured
+    # loggedInUsersCanDoAnything:
+    #   allowAnonymousRead: false
 
 unclassified:
   location:
@@ -18,7 +18,7 @@ unclassified:
 
 jobs:
   - script: |
-      pipelineJob('demo-app') {
+      pipelineJob('manju-demo-app') {
         description('Builds, tests and deploys demo-app. Polls Git every minute.')
         properties {
           pipelineTriggers {
@@ -36,7 +36,7 @@ jobs:
             scm {
               git {
                 remote {
-                  url('${GIT_REPO_URL:-file:///repo}')
+                  url('${GIT_REPO_URL:-https://github.com/ManjulaNaga/Manju-k8s-devops-lab.git}')
                 }
                 branch('*/main')
               }
